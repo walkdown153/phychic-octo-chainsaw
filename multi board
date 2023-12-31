@@ -1,0 +1,60 @@
+wifi  ultiboard
+NRF24+ESP32 development board
+#include <stdio.h>
+#include <nfc/nfc.h>
+
+int main() {
+    nfc_context *context;
+    nfc_init(&context);
+
+    if (context == NULL) {
+        fprintf(stderr, "Unable to init libnfc (malloc)\n");
+        return -1;
+    }
+
+    // Open an NFC device
+    nfc_device *pnd = nfc_open(context, NULL);
+    if (!pnd) {
+        fprintf(stderr, "Error opening NFC device\n");
+        nfc_exit(context);
+        return -1;
+    }
+
+    printf("NFC reader: %s opened\n", nfc_device_get_name(pnd));
+
+    // Set the modulation type to ISO14443A
+    if (nfc_device_set_property_bool(pnd, NP_HANDLE_CRC, true) < 0 ||
+        nfc_device_set_property_bool(pnd, NP_EASY_FRAMING, true) < 0) {
+        nfc_perror(pnd, "nfc_device_set_property_bool");
+        nfc_close(pnd);
+        nfc_exit(context);
+        return -1;
+    }
+
+    // Initialize the NFC reader
+    if (nfc_initiator_init(pnd) < 0) {
+        nfc_perror(pnd, "nfc_initiator_init");
+        nfc_close(pnd);
+        nfc_exit(context);
+        return -1;
+    }
+
+    printf("NFC reader: %s opened\n", nfc_device_get_name(pnd));
+
+    // Poll for NFC targets
+    printf("Waiting for NFC card...\n");
+    nfc_target nt;
+    if (nfc_initiator_poll_target(pnd, nmMifare, NULL, 0, 0, &nt) > 0) {
+        printf("NFC card detected!\n");
+        printf("NFC card's modulation type: %s\n", nfc_modulation_type_name(nt.nm.nmt));
+        printf("NFC card's frequency: %s\n", nfc_baud_rate_name(nt.nm.nbr));
+    } else {
+        printf("No NFC card detected.\n");
+    }
+
+    // Close the NFC device
+    nfc_close(pnd);
+    nfc_exit(context);
+
+    return 0;
+}
